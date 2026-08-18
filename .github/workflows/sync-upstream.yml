@@ -1,0 +1,60 @@
+name: Sync from Kapture-CRM/pipecat-demo-app
+
+on:
+  schedule:
+    - cron: "13 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  UPSTREAM_REPO: Kapture-CRM/pipecat-demo-app
+  UPSTREAM_BRANCH: main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Clone upstream repo
+        env:
+          UPSTREAM_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${UPSTREAM_TOKEN}" ]; then
+            echo "::error::UPSTREAM_SYNC_TOKEN secret is not set. Add a PAT with read access to ${UPSTREAM_REPO} in repo Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          git clone --depth 1 --branch "${UPSTREAM_BRANCH}" \
+            "https://x-access-token:${UPSTREAM_TOKEN}@github.com/${UPSTREAM_REPO}.git" \
+            /tmp/upstream
+
+      - name: Mirror upstream files into this repo
+        run: |
+          set -euo pipefail
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            /tmp/upstream/ ./
+
+      - name: Open PR with any upstream changes
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Sync updates from ${{ env.UPSTREAM_REPO }}"
+          branch: sync/upstream-updates
+          delete-branch: true
+          title: "Sync: updates from ${{ env.UPSTREAM_REPO }}"
+          body: |
+            Automated sync of the latest changes from
+            https://github.com/${{ env.UPSTREAM_REPO }} (branch `${{ env.UPSTREAM_BRANCH }}`).
+
+            Please review the diff before merging.
+          labels: |
+            automated-sync
