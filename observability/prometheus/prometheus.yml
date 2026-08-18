@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: voicebot
+
+scrape_configs:
+  - job_name: voicebot
+    static_configs:
+      # The bot exposes /metrics on the host (VOICEBOT_METRICS_PORT).
+      # If you containerize the bot, replace this with its service name.
+      - targets: ["host.docker.internal:9188"]
+        labels:
+          service: pipecat-voicebot
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

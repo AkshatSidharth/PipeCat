@@ -1,0 +1,1265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Voicebot Console</title>
+<style>
+  :root {
+    --bg:#0d1117; --panel:#151b23; --panel2:#1b2330; --line:#262f3d; --line2:#303c4d;
+    --text:#e6edf3; --muted:#8b98a9; --dim:#5d6b7d;
+    --accent:#4c8dff; --good:#3fb950; --warn:#d29922; --bad:#f85149; --bot:#a371f7;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);display:flex;flex-direction:column;
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+
+  header{display:flex;align-items:center;gap:14px;padding:11px 20px;
+    border-bottom:1px solid var(--line);background:var(--panel);flex:none}
+  header h1{font-size:15px;font-weight:600;margin:0}
+  .spacer{flex:1}
+  nav{display:flex;gap:4px;background:var(--panel2);padding:3px;border-radius:9px}
+  nav button{background:none;border:none;color:var(--muted);padding:6px 16px;border-radius:6px;
+    font:inherit;font-weight:600;cursor:pointer}
+  nav button.on{background:var(--accent);color:#fff}
+
+  .pill{display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:999px;
+    font-size:12px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:none}
+  .dot.on{background:var(--good);box-shadow:0 0 0 3px rgba(63,185,80,.15)}
+  .dot.busy{background:var(--warn);box-shadow:0 0 0 3px rgba(210,153,34,.15)}
+  .dot.err{background:var(--bad);box-shadow:0 0 0 3px rgba(248,81,73,.15)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .dot.live{animation:pulse 1.1s ease-in-out infinite}
+
+  button{font:inherit;font-weight:600;color:var(--text);cursor:pointer;background:var(--panel2);
+    border:1px solid var(--line);padding:8px 15px;border-radius:8px;transition:.15s}
+  button:hover:not(:disabled){border-color:var(--accent)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+  button.sm{padding:5px 10px;font-size:12px}
+  button.ghost.active{border-color:var(--warn);color:var(--warn)}
+
+  main{flex:1;min-height:0;display:none}
+  main.on{display:grid}
+
+  /* ---------- BUILD ---------- */
+  #build{grid-template-columns:230px 1fr}
+  .sidebar{border-right:1px solid var(--line);background:var(--panel);overflow-y:auto;padding:12px}
+  .sidebar h2{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);
+    margin:4px 0 10px;font-weight:600}
+  .alist{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+  .aitem{padding:9px 11px;border-radius:8px;border:1px solid transparent;cursor:pointer}
+  .aitem:hover{background:var(--panel2)}
+  .aitem.on{background:var(--panel2);border-color:var(--accent)}
+  .aitem .n{font-weight:600;font-size:13px}
+  .aitem .d{font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .form{overflow-y:auto;padding:22px 26px}
+  .form-inner{max-width:900px}
+  fieldset{border:1px solid var(--line);border-radius:11px;padding:16px 18px;margin:0 0 16px}
+  legend{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--accent);
+    font-weight:700;padding:0 7px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+  .f{display:flex;flex-direction:column;gap:5px}
+  .f label{font-size:12px;color:var(--muted);font-weight:500}
+  .f .help{font-size:11px;color:var(--dim);line-height:1.4}
+  input,select,textarea{background:#0d1117;color:var(--text);border:1px solid var(--line2);
+    border-radius:7px;padding:8px 10px;font:inherit;width:100%}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  textarea{font-family:var(--mono);font-size:12px;line-height:1.6;resize:vertical;min-height:120px}
+  .row2{display:flex;align-items:center;gap:8px}
+  .row2 input[type=checkbox]{width:auto}
+  .tscript{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+  .tline{display:flex;gap:10px;padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--line);font-size:13px}
+  .tline:last-child{border-bottom:0}
+  .tline:hover{background:var(--hover)}
+  .tline.on{background:var(--hover);box-shadow:inset 3px 0 0 var(--accent)}
+  .tline .tt{color:var(--dim);font-family:var(--mono);font-size:11px;min-width:52px}
+  .tline .who{font-weight:600;min-width:56px}
+  .tline.bot .who{color:var(--accent)}
+  pre.mono{font-family:var(--mono);font-size:12px;white-space:pre-wrap;margin:0;color:var(--dim)}
+  .tag{font-size:10px;padding:2px 7px;border-radius:5px;background:rgba(63,185,80,.15);
+    color:var(--good);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+  .tag.warn{background:rgba(210,153,34,.15);color:var(--warn)}
+  .formbar{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);
+    padding:12px 26px;display:flex;gap:10px;align-items:center;margin:0 -26px -22px}
+
+  /* ---------- TEST ---------- */
+  #test{grid-template-columns:1fr 360px}
+  #calls{grid-template-columns:280px 1fr}
+  .transcript{display:flex;flex-direction:column;min-height:0}
+  #log{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:11px}
+  .msg{max-width:78%;padding:9px 13px;border-radius:12px;word-wrap:break-word}
+  .msg .who{font-size:10px;text-transform:uppercase;letter-spacing:.6px;opacity:.6;margin-bottom:2px}
+  .msg.user{align-self:flex-end;background:rgba(76,141,255,.13);border:1px solid rgba(76,141,255,.3)}
+  .msg.user .who{color:var(--accent)}
+  .msg.bot{align-self:flex-start;background:rgba(163,113,247,.11);border:1px solid rgba(163,113,247,.28)}
+  .msg.bot .who{color:var(--bot)}
+  .msg.event{align-self:center;max-width:100%;background:none;border:none;color:var(--dim);
+    font-size:12px;font-family:var(--mono);padding:2px}
+  .empty{margin:auto;text-align:center;color:var(--dim)}
+  .bar{display:flex;align-items:center;gap:10px;padding:11px 20px;border-top:1px solid var(--line);
+    background:var(--panel)}
+  .meter{flex:1;height:6px;background:var(--panel2);border-radius:3px;overflow:hidden}
+  .meter>i{display:block;height:100%;width:0;background:var(--good);transition:width .07s linear}
+
+  aside{border-left:1px solid var(--line);background:var(--panel);overflow-y:auto;padding:15px}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:13px}
+  .card h2{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);
+    margin:0 0 11px;font-weight:600}
+  .big{font-family:var(--mono);font-size:33px;font-weight:600;line-height:1}
+  .big small{font-size:14px;color:var(--muted);font-weight:400;margin-left:3px}
+  .good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+  .split{margin-top:13px;display:flex;flex-direction:column;gap:8px}
+  .split .row{display:grid;grid-template-columns:88px 1fr 54px;align-items:center;gap:9px;font-size:12px}
+  .split .row span:first-child{color:var(--muted)}
+  .split .row b{font-family:var(--mono);font-weight:500;text-align:right}
+  .track{height:5px;background:#0d1117;border-radius:3px;overflow:hidden}
+  .track>i{display:block;height:100%;width:0;transition:width .3s}
+  .track>i.td{background:var(--warn)}.track>i.rs{background:var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  td{padding:4px 0;color:var(--muted)}
+  td+td{text-align:right;color:var(--text);font-family:var(--mono)}
+  .hint{font-size:11px;color:var(--dim);margin-top:9px;line-height:1.45}
+  a{color:var(--accent)}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--panel2);
+    border:1px solid var(--accent);padding:10px 18px;border-radius:9px;font-size:13px;
+    opacity:0;pointer-events:none;transition:.2s;z-index:50}
+  .toast.on{opacity:1}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎙 Voicebot Console</h1>
+  <nav>
+    <button id="navBuild" class="on">Build</button>
+    <button id="navTest">Test call</button>
+    <button id="navCalls">Calls</button>
+  </nav>
+  <div class="spacer"></div>
+  <span class="pill" id="pAgent">No agent</span>
+  <span class="pill"><i class="dot" id="dConn"></i><span id="tConn">Disconnected</span></span>
+  <span class="pill"><i class="dot" id="dWho"></i><span id="tWho">Idle</span></span>
+  <button id="btnMic" class="ghost" disabled>Mute</button>
+  <button id="btnCall" class="primary">Start call</button>
+</header>
+
+<!-- ============================ CALLS ============================ -->
+<main id="calls">
+  <div class="sidebar">
+    <div class="shead">
+      <b>Past calls</b>
+      <button class="ghost" id="callsRefresh">Refresh</button>
+    </div>
+    <div id="callList" class="alist"></div>
+  </div>
+  <div class="pane">
+    <div id="callEmpty" class="help" style="padding:24px">
+      Select a call to review it. Every ended session is listed here with its
+      recording and transcript.
+    </div>
+    <div id="callDetail" style="display:none">
+      <div class="shead" style="padding:0 0 12px">
+        <div>
+          <b id="cdTitle">—</b>
+          <div class="help" id="cdSub">—</div>
+        </div>
+        <span class="tag" id="cdDisp">—</span>
+      </div>
+
+      <audio id="cdAudio" controls style="width:100%;margin-bottom:6px"></audio>
+      <div class="help" id="cdTrack" style="margin-bottom:14px">
+        Stereo: caller on the left channel, bot on the right.
+      </div>
+
+      <fieldset>
+        <legend>Transcript</legend>
+        <div class="help" style="margin-bottom:8px">
+          Click any line to jump the audio there. Timestamps share the recording's
+          clock, so they line up with what you hear.
+        </div>
+        <div id="cdTranscript" class="tscript"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Outcome</legend>
+        <div id="cdOutcome"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Measured</legend>
+        <pre id="cdMeasured" class="mono"></pre>
+      </fieldset>
+    </div>
+  </div>
+</main>
+
+<!-- ============================ BUILD ============================ -->
+<main id="build" class="on">
+  <div class="sidebar">
+    <h2>Agents</h2>
+    <div class="alist" id="alist"></div>
+    <button class="sm" id="btnNew" style="width:100%">+ New agent</button>
+    <h2 style="margin-top:20px">Credentials</h2>
+    <div id="creds" style="display:flex;flex-direction:column;gap:6px"></div>
+  </div>
+
+  <div class="form">
+    <div class="form-inner">
+      <fieldset>
+        <legend>Identity</legend>
+        <div class="grid">
+          <div class="f"><label>Name</label><input id="f_name" placeholder="Support line" /></div>
+          <div class="f"><label>Description</label><input id="f_description" placeholder="What this agent is for" /></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Speech to text — Soniox</legend>
+        <div class="grid">
+          <div class="f"><label>Model</label><select id="f_stt_model"></select></div>
+          <div class="f">
+            <label>Languages</label>
+            <div id="langbox" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+            <div class="help">Two or more turns on language identification, which lets the voice follow the caller.</div>
+          </div>
+          <div class="f">
+            <label>Restrict to these languages</label>
+            <div class="row2"><input type="checkbox" id="f_stt_languages_strict" /><span class="help">Off = a third language is still transcribed</span></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Language model</legend>
+        <div class="grid">
+          <div class="f" style="grid-column:1/-1">
+            <label>Provider</label><select id="llmProvider"></select>
+            <div class="help" id="llmProviderNote"></div>
+          </div>
+          <div class="f custom-llm" style="grid-column:1/-1">
+            <label>Base URL</label>
+            <input id="f_llm_base_url" placeholder="http://host:port/v1"
+                   style="font-family:var(--mono);font-size:12px" />
+            <div class="help">Any OpenAI-compatible server. Must include
+              <code>/v1</code>. The credential comes from
+              <code>VOICEBOT_LLM_API_KEY</code> in <code>.env</code>, never from
+              the agent file.</div>
+          </div>
+          <div class="f">
+            <label>Model <span id="llmSrc" class="tag" style="display:none">live</span></label>
+            <select id="llmPick"><option value="">— loading from your account —</option></select>
+            <input id="f_llm_model" placeholder="or type any model id"
+                   style="margin-top:6px;font-family:var(--mono);font-size:12px" />
+            <div class="help" id="llmNote"></div>
+          </div>
+          <div class="f"><label>Max reply tokens</label>
+            <input type="number" id="f_llm_max_tokens" min="32" max="131072" />
+            <div class="help" id="ctxNote">Cap on ONE reply, not the context. A voice reply
+              is 20–60 tokens; setting this high does not make replies better, it just
+              reserves context that history then cannot use.</div></div>
+          <div class="f openai-llm">
+            <label>Service tier</label><select id="f_openai_service_tier"></select>
+            <div class="help">"priority" is a paid add-on; blank uses your account default.</div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Text to speech</legend>
+        <div class="grid">
+          <div class="f"><label>Provider</label><select id="f_tts_provider"></select></div>
+        </div>
+        <div class="grid sarvam-only" style="margin-top:14px">
+          <div class="f"><label>Sarvam model</label><select id="f_tts_model"></select></div>
+          <div class="f"><label>Sarvam voice</label><select id="f_sarvam_speaker"></select></div>
+          <div class="f"><label>Opening language</label><select id="f_sarvam_language"></select>
+            <div class="help">Spoken before the caller says anything, so it can't be detected.</div></div>
+          <div class="f"><label>Min buffer size</label><input type="number" id="f_sarvam_min_buffer_size" min="1" max="300" />
+            <div class="help">Characters buffered before synthesis starts. Lower = faster, less natural.</div></div>
+        </div>
+        <div class="grid eleven-only" style="margin-top:14px">
+          <div class="f"><label>ElevenLabs model</label><select id="f_elevenlabs_model"></select></div>
+          <div class="f"><label>Voice ID</label>
+            <input id="f_elevenlabs_voice_id" placeholder="e.g. 9lx2GDtpvyyNBM7O9Mmx"
+                   style="font-family:var(--mono);font-size:12px" />
+            <div class="help">Free ElevenLabs accounts can only use <b>premade</b> voices via
+              the API — library/professional voices return 402 until you upgrade. Checked on save.</div>
+          </div>
+        </div>
+        <div class="grid omni-only" style="margin-top:14px">
+          <div class="f"><label>Server URL</label>
+            <input id="f_omnivoice_url" placeholder="ws://172.16.1.4:80/omnivoice-tts"
+                   style="font-family:var(--mono);font-size:12px" />
+            <div class="help">Base websocket URL; <code>/ws/&lt;call_id&gt;</code> is appended.</div></div>
+          <div class="f"><label>Voice</label><select id="f_omnivoice_voice_id"></select>
+            <div class="help">Voice-clone alias. An unknown alias <b>does not error</b> — the
+              server quietly falls back to its un-cloned auto voice, so a typo is silent.</div></div>
+          <div class="f"><label>Speed</label><input type="number" step="0.05" id="f_omnivoice_speed" min="0.5" max="2" /></div>
+          <div class="f" style="grid-column:1/-1">
+            <div class="help">First audio lands in <b>~450ms</b> regardless of how short the
+              text is (~420ms of that is the model's own decoder). That is most of a
+              sub-500ms budget on its own — pick OmniVoice for its voice cloning, not for speed.</div>
+          </div>
+        </div>
+        <div class="f" style="grid-column:1/-1;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
+          <label>Hear it before you dial</label>
+          <div class="row2" style="gap:8px">
+            <input id="previewText" placeholder="leave blank to speak the greeting"
+                   style="flex:1" />
+            <button type="button" class="btn" id="previewBtn">▶ Speak</button>
+          </div>
+          <div class="help" id="previewNote">Renders with the settings currently in this form —
+            provider, model, voice and speed — so what you hear is what the call would say.</div>
+        </div>
+        <div class="grid" style="margin-top:14px">
+          <div class="f"><label>Text aggregation</label><select id="f_tts_text_aggregation"></select></div>
+          <div class="f"><label>Follow caller's language</label>
+            <div class="row2"><input type="checkbox" id="f_tts_follow_caller_language" /><span class="help">Switch voice mid-call</span></div></div>
+          <div class="f"><label>Switch after N turns</label><input type="number" id="f_tts_language_switch_after" min="1" max="5" />
+            <div class="help">2 stops one Hinglish turn from flipping the voice.</div></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Turn taking &amp; interruptions</legend>
+        <div class="grid">
+          <div class="f"><label>VAD stop (seconds)</label><input type="number" step="0.05" id="f_vad_stop_secs" />
+            <div class="help">Dead air before turn detection runs — the biggest latency lever.</div></div>
+          <div class="f"><label>Smart turn ceiling (seconds)</label><input type="number" step="0.5" id="f_smart_turn_stop_secs" />
+            <div class="help">Fallback only; not on the happy path.</div></div>
+          <div class="f"><label>Barge-in min words</label><input type="number" id="f_interrupt_min_words" min="0" max="10" />
+            <div class="help">0 = interrupt on any speech. <b>Ignored while
+              "Ignore caller backchannels" is on</b> — the lexicon below replaces it,
+              and stacking both would swallow one-word commands like "stop".</div></div>
+          <div class="f"><label>Wait for transcript</label>
+            <div class="row2"><input type="checkbox" id="f_wait_for_transcript" /><span class="help">Keep on for cascaded STT</span></div></div>
+          <div class="f"><label>STT TTFS p99 (seconds)</label><input type="number" step="0.05" id="f_stt_ttfs_p99" /></div>
+          <div class="f" style="grid-column:1/-1">
+            <label>Smart turn model</label>
+            <input id="f_smart_turn_model_path" placeholder="blank = bundled English v3.2"
+                   style="font-family:var(--mono);font-size:12px" />
+            <div class="help">Path to a fine-tuned ONNX model. Must keep the v3 contract:
+              <code>input_features (B, 80, 800)</code> in, sigmoid probabilities out.
+              Checked when you save.</div>
+          </div>
+          <div class="f">
+            <label>End-of-turn threshold</label>
+            <input type="number" step="0.05" min="0.05" max="0.95" id="f_smart_turn_threshold" />
+            <div class="help">Probability above which the turn is judged finished.
+              Pipecat hardcodes 0.5; <b>higher waits through more mid-turn pauses</b>
+              (fewer interruptions, slightly slower replies). Fine-tuned models usually
+              publish their own operating point.</div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Backchannels</legend>
+        <div class="help" style="margin-bottom:12px">
+          Indian callers acknowledge constantly while you speak — <i>hmm</i>, <i>haan haan</i>,
+          <i>ji ji</i>. These settings stop that from cutting the bot off, and let the bot
+          do the same thing back while the caller talks at length.
+        </div>
+        <div class="grid">
+          <div class="f"><label>Ignore caller backchannels</label>
+            <div class="row2"><input type="checkbox" id="f_backchannel_suppression" /><span class="help">Don't interrupt on "hmm"/"haan haan"</span></div>
+            <div class="help">Only while the bot is speaking. After it stops, the same
+              words are an <b>answer</b> and always start a turn. "stop"/"रुकिए"/"नहीं"
+              always interrupt either way.</div></div>
+          <div class="f"><label>Max varied acknowledgements</label><input type="number" id="f_backchannel_max_tokens" min="1" max="12" />
+            <div class="help">Caps only a run of <i>different</i> words. A <b>repetitive</b>
+              run — "हाँ हाँ हाँ हाँ हाँ" — is never capped, however long; that is how
+              Indian callers backchannel.</div></div>
+          <div class="f"><label>Counts as repetition under</label><input type="number" id="f_backchannel_max_distinct" min="1" max="6" />
+            <div class="help">Distinct acknowledgements still treated as repetition.
+              "haan"/"haaan"/"haanhaan" fold into one first.</div></div>
+          <div class="f"><label>Bot filler backchannels</label>
+            <div class="row2"><input type="checkbox" id="f_filler_enabled" /><span class="help">Say "hmm"/"ji ji" while the caller talks</span></div>
+            <div class="help">Played through the output <b>mixer</b>, the only path that
+              cannot delay the real reply. Never fires while the bot is speaking.</div></div>
+          <div class="f"><label>Speak after (seconds)</label><input type="number" step="0.5" id="f_filler_after_secs" min="1" max="15" />
+            <div class="help">Continuous caller speech before the first filler.</div></div>
+          <div class="f"><label>Repeat every (seconds)</label><input type="number" step="0.5" id="f_filler_interval_secs" min="1" max="30" /></div>
+          <div class="f"><label>Max per utterance</label><input type="number" id="f_filler_max_per_turn" min="1" max="10" /></div>
+          <div class="f"><label>Filler volume</label><input type="number" step="0.05" id="f_filler_gain" min="0.1" max="1" />
+            <div class="help">Fraction of full volume. Above ~0.7 it reads as the bot
+              interrupting rather than acknowledging.</div></div>
+          <div class="f" style="grid-column:1/-1">
+            <label>Filler phrases — one per line, per tone</label>
+            <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px">
+              <div>
+                <div class="help" style="margin-bottom:4px"><b>neutral</b> — ordinary listening</div>
+                <textarea id="f_filler_phrases_neutral" rows="3" placeholder="ह्म्म ह्म्म&#10;जी जी"></textarea>
+              </div>
+              <div>
+                <div class="help" style="margin-bottom:4px"><b>emphatic</b> — caller is loud/animated</div>
+                <textarea id="f_filler_phrases_emphatic" rows="3" placeholder="जी जी&#10;हाँ जी"></textarea>
+              </div>
+              <div>
+                <div class="help" style="margin-bottom:4px"><b>hesitant</b> — caller is quiet/unsure</div>
+                <textarea id="f_filler_phrases_hesitant" rows="3" placeholder="ह्म्म ह्म्म&#10;जी हाँ"></textarea>
+              </div>
+            </div>
+            <div class="help">Blank uses the built-in set for the agent's language. Keep them
+              to two words — single tokens often render as silence. Changing these re-renders
+              the clip cache on the next call.</div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Silence &amp; follow-up</legend>
+        <div class="help" style="margin-bottom:12px">
+          When the caller goes quiet after the bot finishes, check they are still
+          there. The timer only runs between turns — a caller mid-sentence is never
+          talked over — and resets the moment they speak.
+        </div>
+        <div class="grid">
+          <div class="f"><label>Re-engage silent callers</label>
+            <div class="row2"><input type="checkbox" id="f_reengage_enabled" /><span class="help">Ask "hello?" after silence</span></div></div>
+          <div class="f"><label>After (seconds)</label><input type="number" step="0.5" id="f_reengage_after_secs" min="2" max="30" />
+            <div class="help">Silence following a bot turn before the first nudge.</div></div>
+          <div class="f"><label>Max attempts</label><input type="number" id="f_reengage_max_attempts" min="1" max="10" />
+            <div class="help">Then stop, rather than talk into a dead line.</div></div>
+          <div class="f" style="grid-column:1/-1">
+            <label>Prompts — one per line, escalating</label>
+            <textarea id="f_reengage_prompts" rows="4"
+              placeholder="हैलो?&#10;जी, मेरी आवाज़ आ रही है?&#10;क्या आप मुझे सुन पा रहे हैं?"></textarea>
+            <div class="help">Blank uses the built-in set for the agent's language.
+              The last line repeats if attempts exceed the number of prompts.</div>
+          </div>
+          <div class="f"><label>STT finalize watchdog (seconds)</label>
+            <input type="number" step="0.5" id="f_stt_finalize_after" min="0" max="10" />
+            <div class="help">Soniox only emits a transcript on an end token. If one is
+              missed the text waits for the caller's <b>next</b> utterance and arrives glued
+              to it. This re-asks after a stall. 0 disables.</div></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Ending the call</legend>
+        <div class="help" style="margin-bottom:12px">
+          The bot hangs up once it has <b>finished speaking</b> a closing line — on the
+          transport's bot-stopped-speaking signal, not on the text, so the caller never
+          hears the line cut off mid-sentence.
+        </div>
+        <div class="grid">
+          <div class="f"><label>End call on goodbye</label>
+            <div class="row2"><input type="checkbox" id="f_end_call_enabled" /><span class="help">Hang up after the closing line</span></div></div>
+          <div class="f"><label>Linger (seconds)</label><input type="number" step="0.1" id="f_end_call_linger_secs" min="0" max="3" />
+            <div class="help">Covers the transport's jitter buffer, which still holds
+              audio when the bot-stopped signal fires. Too low clips the last syllable.</div></div>
+          <div class="f" style="grid-column:1/-1">
+            <label>Closing lines — one per line</label>
+            <textarea id="f_end_call_phrases" rows="4"
+              placeholder="धन्यवाद, आपका दिन शुभ हो&#10;कॉल करने के लिए धन्यवाद"></textarea>
+            <div class="help">Matched against the <b>end</b> of a reply, not anywhere in it —
+              so a mid-call "धन्यवाद" does not hang up on a talking customer. Write full
+              closing sentences, not single words. Blank uses the built-in set.</div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Post-call analysis</legend>
+        <div class="help" style="margin-bottom:12px">
+          Written beside the recording when the call ends. Latency, counts and tokens
+          are always measured; the switch below only controls the LLM-written
+          disposition, sentiment and summary.
+        </div>
+        <div class="grid">
+          <div class="f"><label>Analyse each call</label>
+            <div class="row2"><input type="checkbox" id="f_analysis_enabled" /><span class="help">Disposition, sentiment, summary</span></div></div>
+          <div class="f"><label>Analysis model</label>
+            <input id="f_analysis_model" placeholder="blank = same model as the call"
+                   style="font-family:var(--mono);font-size:12px" />
+            <div class="help">Runs after the call, so latency does not matter — a
+              bigger model here gives better notes at no cost to the caller.</div></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Behaviour</legend>
+        <div class="f" style="margin-bottom:14px">
+          <label>System prompt</label>
+          <textarea id="f_system_prompt" rows="10"></textarea>
+          <div class="help">Blank falls back to <code>prompts/system.txt</code>.</div>
+          <div class="row2" style="gap:8px;margin-top:8px">
+            <input id="editInstruction" style="flex:1"
+                   placeholder="describe an edit — e.g. add a rule to always reply in one short sentence" />
+            <button type="button" class="btn" id="editPromptBtn">Apply edit</button>
+          </div>
+          <div class="help" id="editNote">Rewrites the <b>whole</b> prompt with your change applied
+            and replaces the box above — review it before saving. On the self-hosted 30B this takes
+            about a minute per 1000 words; set a faster <b>Analysis model</b> if you edit often.</div>
+        </div>
+        <div class="grid" style="grid-template-columns:1fr 220px">
+          <div class="f">
+            <label>Greeting / intro</label>
+            <textarea id="f_greeting" rows="3"></textarea>
+            <div class="help" id="greetHelp"></div>
+          </div>
+          <div class="f">
+            <label>How it is delivered</label>
+            <select id="f_greeting_mode"></select>
+            <div class="help">
+              <b>speak</b> — said word for word, every call, no LLM step.<br>
+              <b>generate</b> — treated as an instruction the LLM writes from.
+            </div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Operations</legend>
+        <div class="grid">
+          <div class="f"><label>Latency budget (ms)</label><input type="number" id="f_latency_budget_ms" min="100" max="5000" /></div>
+          <div class="f"><label>Record calls</label>
+            <div class="row2"><input type="checkbox" id="f_recording_enabled" /><span class="help">Stereo + per-speaker WAV</span></div></div>
+        </div>
+      </fieldset>
+
+      <div class="formbar">
+        <button class="primary" id="btnSave">Save agent</button>
+        <button id="btnCheck">Check services</button>
+        <button id="btnSaveCall">Save &amp; test call</button>
+        <span id="preflight" style="display:flex;gap:8px;align-items:center"></span>
+        <button class="danger" id="btnDelete" style="margin-left:auto">Delete</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ============================ TEST ============================ -->
+<main id="test">
+  <section class="transcript">
+    <div id="log"><div class="empty" id="empty">Pick an agent, then press <b>Start call</b>.</div></div>
+    <div class="bar">
+      <span>🎤</span><div class="meter"><i id="level"></i></div><span class="pill" id="pDur">00:00</span>
+    </div>
+  </section>
+  <aside>
+    <div class="card">
+      <h2>Voice-to-voice latency</h2>
+      <div class="big" id="v2v">—<small>ms</small></div>
+      <div class="split">
+        <div class="row"><span>Turn detect</span><div class="track"><i class="td" id="barTd"></i></div><b id="valTd">—</b></div>
+        <div class="row"><span>Response</span><div class="track"><i class="rs" id="barRs"></i></div><b id="valRs">—</b></div>
+      </div>
+      <div class="hint">Measured in-browser from raw VAD speech-end to first bot audio — the same
+        definition as <code>voicebot_voice_to_voice_latency_seconds</code> in Grafana.</div>
+    </div>
+    <div class="card">
+      <h2>This call</h2>
+      <table>
+        <tr><td>Turns</td><td id="sTurns">0</td></tr>
+        <tr><td>Median</td><td id="sP50">—</td></tr>
+        <tr><td>Worst</td><td id="sMax">—</td></tr>
+        <tr><td>Within budget</td><td id="sBudget">—</td></tr>
+        <tr><td>Interruptions</td><td id="sInt">0</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h2>Service TTFB</h2>
+      <table id="tTtfb"><tr><td colspan="2" style="color:var(--dim)">waiting for metrics…</td></tr></table>
+    </div>
+    <div class="card">
+      <h2>Connection</h2>
+      <table>
+        <tr><td>Bot URL</td><td><input id="url" value="http://localhost:7860" style="width:150px;font-size:11px;padding:3px 6px" /></td></tr>
+      </table>
+      <div class="hint"><a href="http://localhost:3001/d/voicebot-overview" target="_blank" rel="noreferrer">Grafana dashboard →</a></div>
+    </div>
+  </aside>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const API = "";                       // same origin as this page
+let OPTS = null, AGENTS = [], current = null, LLM_MODELS = [];
+
+const FIELDS = ["name","description","stt_model","stt_languages_strict","stt_ttfs_p99",
+  "llm_model","llm_max_tokens","openai_service_tier","llm_base_url","tts_provider","tts_model","elevenlabs_model","elevenlabs_voice_id","sarvam_speaker",
+  "omnivoice_url","omnivoice_voice_id","omnivoice_speed",
+  "sarvam_language","sarvam_min_buffer_size","tts_text_aggregation","tts_follow_caller_language","greeting_mode",
+  "tts_language_switch_after","vad_stop_secs","smart_turn_stop_secs","smart_turn_model_path","smart_turn_threshold","interrupt_min_words",
+  "wait_for_transcript","system_prompt","greeting","latency_budget_ms","recording_enabled",
+  "backchannel_suppression","backchannel_max_tokens","backchannel_max_distinct",
+  "reengage_enabled","reengage_after_secs","reengage_max_attempts","reengage_prompts",
+  "analysis_enabled","analysis_model","stt_finalize_after",
+  "end_call_enabled","end_call_phrases","end_call_linger_secs","filler_enabled","filler_after_secs",
+  "filler_interval_secs","filler_max_per_turn","filler_gain",
+  "filler_phrases_neutral","filler_phrases_emphatic","filler_phrases_hesitant"];
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("on");
+  setTimeout(() => t.classList.remove("on"), 2200);
+}
+
+/* ---------------- form <-> object ---------------- */
+function fill(sel, items, value) {
+  const el = $(sel);
+  el.innerHTML = items.map((i) => {
+    const v = typeof i === "object" ? i.value : i;
+    const l = typeof i === "object" ? i.label : (i === "" ? "(account default)" : i);
+    return `<option value="${v}">${l}</option>`;
+  }).join("");
+  if (value !== undefined) el.value = value;
+}
+
+function renderLanguages(selected) {
+  const chosen = new Set((selected || "").split(",").map((s) => s.trim()).filter(Boolean));
+  $("langbox").innerHTML = OPTS.languages.map((l) => `
+    <label class="pill" style="cursor:pointer">
+      <input type="checkbox" data-lang="${l.stt}" ${chosen.has(l.stt) ? "checked" : ""}
+             style="width:auto;margin:0" /> ${l.label}
+    </label>`).join("");
+}
+function collectLanguages() {
+  return [...document.querySelectorAll("#langbox input:checked")]
+    .map((i) => i.dataset.lang).join(",");
+}
+
+function speakersFor(model) {
+  return (OPTS.tts_speakers || {})[model] || OPTS.tts_speakers["bulbul:v2"] || [];
+}
+
+function toForm(a) {
+  current = a;
+  for (const f of FIELDS) {
+    const el = $("f_" + f);
+    if (!el) continue;
+    if (el.type === "checkbox") el.checked = !!a[f];
+    else el.value = a[f] ?? "";
+  }
+  fill("f_sarvam_speaker", speakersFor(a.tts_model), a.sarvam_speaker);
+  renderLanguages(a.stt_languages);
+  $("pAgent").textContent = a.name || "Unsaved agent";
+  document.querySelectorAll(".aitem").forEach((n) =>
+    n.classList.toggle("on", n.dataset.id === a.id));
+  $("llmProvider").value = providerFor(a.llm_base_url);
+  updateLlmProvider(false);
+  updateLlmNote();
+  updateGreetHelp();
+  updateProvider();
+}
+
+function fromForm() {
+  const a = { ...(current || {}) };
+  for (const f of FIELDS) {
+    const el = $("f_" + f);
+    if (!el) continue;
+    if (el.type === "checkbox") a[f] = el.checked;
+    else if (el.type === "number") a[f] = el.value === "" ? 0 : Number(el.value);
+    else a[f] = el.value;
+  }
+  a.stt_languages = collectLanguages() || "en";
+  return a;
+}
+
+const TIER_LABEL = {
+  fast: "Fastest — best for voice",
+  balanced: "Balanced",
+  slow: "Slower first token",
+  avoid: "Avoid for voice (reasoning)",
+};
+
+function updateProvider() {
+  const p = $("f_tts_provider").value;
+  const groups = { sarvam: ".sarvam-only", elevenlabs: ".eleven-only", omnivoice: ".omni-only" };
+  for (const [name, sel] of Object.entries(groups)) {
+    document.querySelectorAll(sel).forEach((n) => (n.style.display = p === name ? "" : "none"));
+  }
+}
+
+function updateGreetHelp() {
+  const speak = $("f_greeting_mode").value !== "generate";
+  $("greetHelp").innerHTML = speak
+    ? 'Spoken <b>exactly as written</b> at the start of every call. Write the actual line: "Hello, I am Arjun from BigBasket. How can I help?"'
+    : 'Treated as an <b>instruction</b> for the LLM to open with. A strict system prompt may decline it — use <b>speak</b> if the intro must be guaranteed.';
+}
+
+function updateLlmNote() {
+  const id = $("f_llm_model").value;
+  const ctx = (LLM_MODELS.find((x) => x.id === id) || {}).max_model_len;
+  if (ctx && $("ctxNote")) {
+    $("ctxNote").innerHTML =
+      `Cap on ONE reply, not the context. <b>${id}</b> has a ` +
+      `<b>${ctx.toLocaleString()}</b>-token context — the system prompt plus the ` +
+      `whole conversation plus this cap must fit inside it. A voice reply is 20–60 tokens.`;
+  }
+  const m = LLM_MODELS.find((x) => x.id === id);
+  if (!m) {
+    $("llmNote").textContent = "Custom model id — avoid reasoning models on a voice bot.";
+    return;
+  }
+  const cls = m.tier === "avoid" ? "bad" : m.tier === "fast" ? "good" : "";
+  $("llmNote").innerHTML = `<span class="${cls}">${m.note}</span>`;
+  // Keep the picker in sync when the id was typed or loaded from an agent.
+  if ($("llmPick").value !== id) $("llmPick").value = id;
+}
+
+// Which preset matches the agent's stored base_url. The endpoint is the source
+// of truth; the dropdown is a convenience over it, so nothing extra is stored.
+function providerFor(baseUrl) {
+  const presets = OPTS.llm_providers || [];
+  const hit = presets.find((p) => p.id !== "custom" && p.base_url === (baseUrl || ""));
+  return hit ? hit.id : "custom";
+}
+
+function updateLlmProvider(applyPreset) {
+  const id = $("llmProvider").value;
+  const preset = (OPTS.llm_providers || []).find((p) => p.id === id);
+  if (preset && applyPreset) {
+    $("f_llm_base_url").value = preset.base_url;
+    if (preset.model) $("f_llm_model").value = preset.model;
+  }
+  $("llmProviderNote").textContent = preset ? preset.note : "";
+  document.querySelectorAll(".custom-llm").forEach(
+    (n) => (n.style.display = id === "openai" ? "none" : ""));
+  document.querySelectorAll(".openai-llm").forEach(
+    (n) => (n.style.display = id === "openai" ? "" : "none"));
+  updateLlmNote();
+  loadLlmModels();          // a self-hosted server lists only its own model
+}
+
+// Grouped picker, ranked fastest-first. Falls back to the static shortlist if
+// the endpoint is unreachable, so the builder still works offline.
+async function loadLlmModels() {
+  let payload;
+  const base = encodeURIComponent($("f_llm_base_url").value || "");
+  try {
+    payload = await (await fetch(`${API}/api/llm-models?base_url=${base}`)).json();
+  } catch {
+    payload = { models: OPTS.llm_models, source: "static" };
+  }
+  LLM_MODELS = payload.models;
+
+  const groups = {};
+  for (const m of LLM_MODELS) (groups[m.tier] ||= []).push(m);
+  $("llmPick").innerHTML = Object.entries(groups)
+    .map(([tier, list]) =>
+      `<optgroup label="${TIER_LABEL[tier] || tier}">` +
+      list.map((m) => `<option value="${m.id}">${m.id}</option>`).join("") +
+      `</optgroup>`
+    ).join("");
+
+  const tag = $("llmSrc");
+  tag.style.display = "";
+  if (payload.source === "live") {
+    tag.textContent = `${LLM_MODELS.length} live`;
+    tag.className = "tag";
+    tag.title = "Fetched from your OpenAI account";
+  } else {
+    tag.textContent = "offline list";
+    tag.className = "tag warn";
+    tag.title = payload.reason || "Could not reach OpenAI";
+  }
+  updateLlmNote();
+}
+
+/* ---------------- agent list ---------------- */
+function renderList() {
+  $("alist").innerHTML = AGENTS.map((a) => `
+    <div class="aitem ${current && a.id === current.id ? "on" : ""}" data-id="${a.id}">
+      <div class="n">${a.name}</div>
+      <div class="d">${a.description || a.llm_model}</div>
+    </div>`).join("") || `<div class="d" style="color:var(--dim);padding:8px">No agents yet.</div>`;
+  document.querySelectorAll(".aitem").forEach((n) => {
+    n.onclick = async () => {
+      const r = await fetch(`${API}/api/agents/${n.dataset.id}`);
+      if (r.ok) toForm(await r.json());
+    };
+  });
+}
+
+async function refresh() {
+  AGENTS = await (await fetch(`${API}/api/agents`)).json();
+  renderList();
+}
+
+async function boot() {
+  OPTS = await (await fetch(`${API}/api/options`)).json();
+
+  fill("f_stt_model", OPTS.stt_models);
+  fill("f_openai_service_tier", OPTS.service_tiers);
+  fill("f_tts_model", OPTS.tts_models);
+  fill("f_tts_text_aggregation", OPTS.aggregation_modes);
+  fill("f_greeting_mode", OPTS.greeting_modes || ["speak", "generate"]);
+  fill("f_tts_provider", OPTS.tts_providers || ["sarvam", "elevenlabs"]);
+  fill("f_elevenlabs_model", OPTS.elevenlabs_models || ["eleven_flash_v2_5"]);
+  fill("f_omnivoice_voice_id",
+       (OPTS.omnivoice_voices || []).map((v) => ({ value: v.id, label: v.label })));
+  $("f_tts_provider").onchange = updateProvider;
+  $("f_greeting_mode").onchange = updateGreetHelp;
+  fill("f_sarvam_language", OPTS.languages.map((l) => ({ value: l.tts, label: l.label })));
+
+  $("creds").innerHTML = Object.entries(OPTS.credentials).map(([k, ok]) =>
+    `<span class="pill"><i class="dot ${ok ? "on" : "err"}"></i>${k}${ok ? "" : " — key missing"}</span>`
+  ).join("");
+
+  $("f_tts_model").onchange = () => {
+    const list = speakersFor($("f_tts_model").value);
+    fill("f_sarvam_speaker", list, list[0]);
+  };
+  $("f_llm_model").oninput = updateLlmNote;
+
+  // --- hear the TTS before dialling ---
+  let previewAudio = null;
+  $("previewBtn").onclick = async () => {
+    const btn = $("previewBtn"), note = $("previewNote");
+    const text = ($("previewText").value || $("f_greeting").value || "").trim();
+    if (!text) { note.textContent = "Nothing to speak — type something or set a greeting."; return; }
+    btn.disabled = true; btn.textContent = "synthesizing…";
+    note.textContent = "";
+    try {
+      const body = { ...fromForm(), text };
+      const res = await fetch(`${API}/api/tts-preview`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const secs = res.headers.get("X-Duration-Secs");
+      const blob = await res.blob();
+      if (previewAudio) { previewAudio.pause(); URL.revokeObjectURL(previewAudio.src); }
+      previewAudio = new Audio(URL.createObjectURL(blob));
+      await previewAudio.play();
+      note.innerHTML = `<span class="good">${secs}s of audio — ` +
+        `${$("f_tts_provider").value}</span>`;
+    } catch (e) {
+      note.innerHTML = `<span class="bad">${e.message}</span>`;
+    } finally {
+      btn.disabled = false; btn.textContent = "▶ Speak";
+    }
+  };
+
+  // --- LLM-assisted prompt editing ---
+  $("editPromptBtn").onclick = async () => {
+    const btn = $("editPromptBtn"), note = $("editNote");
+    const instruction = $("editInstruction").value.trim();
+    if (!instruction) { note.innerHTML = `<span class="bad">Describe the edit first.</span>`; return; }
+    btn.disabled = true; btn.textContent = "rewriting…";
+    note.textContent = "Rewriting the whole prompt — this can take a few minutes on a local model.";
+    try {
+      const body = { ...fromForm(), prompt: $("f_system_prompt").value, instruction };
+      delete body.system_prompt;
+      const res = await fetch(`${API}/api/edit-prompt`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+      $("f_system_prompt").value = data.prompt;
+      $("editInstruction").value = "";
+      note.innerHTML = `<span class="good">Rewritten: ${data.was_chars} → ${data.chars} chars. ` +
+        `Review it, then Save.</span>`;
+    } catch (e) {
+      note.innerHTML = `<span class="bad">${e.message}</span>`;
+    } finally {
+      btn.disabled = false; btn.textContent = "Apply edit";
+    }
+  };
+  $("llmPick").onchange = () => {
+    if (!$("llmPick").value) return;
+    $("f_llm_model").value = $("llmPick").value;
+    updateLlmNote();
+  };
+  fill("llmProvider", (OPTS.llm_providers || []).map(
+    (p) => ({ value: p.id, label: p.label })));
+  // Switching provider applies its preset; loading an agent must not.
+  $("llmProvider").onchange = () => updateLlmProvider(true);
+  $("f_llm_base_url").oninput = () => loadLlmModels();
+
+  LLM_MODELS = OPTS.llm_models;      // shortlist until the live call resolves
+  await refresh();
+  toForm(AGENTS[0] || OPTS.defaults);
+  loadLlmModels();                    // async: never blocks first paint
+}
+
+/* ---------------- save / delete ---------------- */
+async function save() {
+  const a = fromForm();
+  if (!a.name.trim()) { toast("Give the agent a name"); return null; }
+  const res = await fetch(`${API}/api/agents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(a),
+  });
+  if (!res.ok) { toast("Save failed"); return null; }
+  const saved = await res.json();
+  await refresh();
+  toForm(saved);
+  toast(`Saved "${saved.name}"`);
+  return saved;
+}
+
+async function checkServices(agent) {
+  const box = $("preflight");
+  box.innerHTML = '<span class="pill">checking…</span>';
+  try {
+    const r = await fetch(`${API}/api/preflight`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(agent || fromForm()),
+    });
+    const d = await r.json();
+    box.innerHTML = d.results.map((x) =>
+      `<span class="pill" title="${(x.detail || "").replace(/"/g, "&quot;")}">
+         <i class="dot ${x.ok ? "on" : "err"}"></i>${x.service}</span>`).join("");
+    if (!d.ok) {
+      const bad = d.results.filter((x) => !x.ok);
+      toast(bad.map((b) => `${b.service}: ${b.detail}`).join(" · "));
+    }
+    return d.ok;
+  } catch (e) {
+    box.innerHTML = '<span class="pill"><i class="dot err"></i>check failed</span>';
+    return false;
+  }
+}
+
+$("btnCheck").onclick = () => checkServices();
+$("btnSave").onclick = async () => {
+  const saved = await save();
+  if (saved) checkServices(saved);   // catches bad model/voice at build time
+  return saved;
+};
+$("btnNew").onclick = () => toForm({ ...OPTS.defaults, id: "", name: "", description: "" });
+$("btnDelete").onclick = async () => {
+  if (!current?.id) { toast("Nothing saved to delete"); return; }
+  if (!confirm(`Delete "${current.name}"?`)) return;
+  await fetch(`${API}/api/agents/${current.id}`, { method: "DELETE" });
+  LLM_MODELS = OPTS.llm_models;      // shortlist until the live call resolves
+  await refresh();
+  toForm(AGENTS[0] || OPTS.defaults);
+  loadLlmModels();                    // async: never blocks first paint
+  toast("Deleted");
+};
+$("btnSaveCall").onclick = async () => {
+  const saved = await save();
+  if (saved) { showTab("test"); if (!pc) connect(); }
+};
+
+/* ---------------- tabs ---------------- */
+function showTab(which) {
+  for (const t of ["build", "test", "calls"]) {
+    $(t).classList.toggle("on", which === t);
+    $("nav" + t[0].toUpperCase() + t.slice(1)).classList.toggle("on", which === t);
+  }
+  if (which === "calls") loadCalls();
+}
+$("navBuild").onclick = () => showTab("build");
+$("navTest").onclick = () => showTab("test");
+$("navCalls").onclick = () => showTab("calls");
+
+/* ================= CALL REVIEW ================= */
+let CALLS = [], curCall = null, tlines = [];
+
+const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+async function loadCalls() {
+  try {
+    const d = await (await fetch(`${API}/api/calls`)).json();
+    CALLS = d.calls || [];
+  } catch { CALLS = []; }
+  $("callList").innerHTML = CALLS.length ? CALLS.map((c, i) => {
+    const when = (c.stem || "").slice(0, 15).replace(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})$/,
+      "$3/$2 $4:$5:$6");
+    const disp = c.pending ? "analysing…" : (c.disposition || "—");
+    return `<div class="aitem" data-i="${i}">
+      <div><b>${c.agent}</b> <span class="help">${when}</span></div>
+      <div class="help">${disp} · ${c.duration_secs ?? "?"}s · ${c.exchanges ?? 0} turns
+        ${c.v2v_p50 ? `· v2v ${c.v2v_p50}s` : ""}</div>
+      <div class="help mono" style="font-size:10px">${c.call_id || ""}</div>
+    </div>`;
+  }).join("") : `<div class="help" style="padding:14px">No calls yet.</div>`;
+  document.querySelectorAll("#callList .aitem").forEach((n) =>
+    (n.onclick = () => openCall(CALLS[+n.dataset.i], n)));
+}
+
+async function openCall(c, node) {
+  document.querySelectorAll("#callList .aitem").forEach((n) => n.classList.remove("on"));
+  if (node) node.classList.add("on");
+  let d;
+  try {
+    d = await (await fetch(`${API}/api/calls/${encodeURIComponent(c.agent)}/${encodeURIComponent(c.stem)}`)).json();
+  } catch (e) { return; }
+  curCall = d;
+  $("callEmpty").style.display = "none";
+  $("callDetail").style.display = "";
+
+  $("cdTitle").textContent = `${d.agent} · ${d.call_id}`;
+  $("cdSub").textContent = `${d.ended_at} · ${d.duration_secs}s · ` +
+    `${(d.measured || {}).exchanges || 0} exchanges · ended by ${(d.measured || {}).ended_by || "—"}`;
+  const a = d.analysis || {};
+  $("cdDisp").textContent = a.pending ? "analysing…" : (a.disposition || "—");
+
+  // audio: prefer the stereo mix so both sides are audible
+  const src = (d.audio || {}).mixed || (d.audio || {}).user || (d.audio || {}).bot;
+  const au = $("cdAudio");
+  if (src) { au.src = API + src; $("cdTrack").style.display = ""; }
+  else { au.removeAttribute("src"); $("cdTrack").style.display = "none"; }
+
+  // transcript, clickable to seek
+  const t = d.transcript || [];
+  tlines = t;
+  $("cdTranscript").innerHTML = t.length ? t.map((x, i) =>
+    `<div class="tline ${x.role === "bot" ? "bot" : ""}" data-i="${i}" data-at="${x.at_secs || 0}">
+       <span class="tt">${fmtTime(x.at_secs || 0)}</span>
+       <span class="who">${x.role === "bot" ? "BOT" : "CALLER"}</span>
+       <span>${(x.text || "").replace(/[<>&]/g, (ch) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[ch]))}</span>
+     </div>`).join("") : `<div class="help" style="padding:12px">No transcript recorded.</div>`;
+  document.querySelectorAll("#cdTranscript .tline").forEach((n) => (n.onclick = () => {
+    const at = parseFloat(n.dataset.at) || 0;
+    if (au.src) { au.currentTime = at; au.play(); }
+  }));
+
+  // outcome
+  const rows = [];
+  const add = (k, v) => { if (v !== undefined && v !== null && v !== "") rows.push(
+    `<div class="f" style="margin-bottom:8px"><label>${k}</label><div>${v}</div></div>`); };
+  add("Sentiment", a.sentiment ? `${a.sentiment}${a.sentiment_reason ? ` — <span class="help">${a.sentiment_reason}</span>` : ""}` : null);
+  add("Resolved", a.resolved === undefined ? null : String(a.resolved));
+  add("Caller intent", a.caller_intent);
+  add("Summary", a.summary || a.error || a.pending || a.skipped);
+  for (const [label, key] of [["Key points", "key_points"], ["Action items", "action_items"], ["Bot issues", "bot_issues"]]) {
+    const items = a[key] || [];
+    if (items.length) add(label, "<ul style='margin:0;padding-left:18px'>" +
+      items.map((i) => `<li>${i}</li>`).join("") + "</ul>");
+  }
+  $("cdOutcome").innerHTML = rows.join("") || `<div class="help">—</div>`;
+
+  // measured block, reusing the server's own rendering shape
+  const m = d.measured || {}, lat = m.latency || {};
+  const row = (label, st, unit = "s") => st && st.n
+    ? `${label.padEnd(22)} p50 ${String(st.p50).padStart(6)}${unit}   p90 ${String(st.p90).padStart(6)}${unit}   max ${String(st.max).padStart(6)}${unit}   (n=${st.n})`
+    : `${label.padEnd(22)} —`;
+  $("cdMeasured").textContent = [
+    row("voice-to-voice", lat.voice_to_voice),
+    row("  turn detection", lat.turn_detection),
+    row("  response (LLM+TTS)", lat.response),
+    `${"over budget".padEnd(22)} ${lat.over_budget ?? 0}/${m.exchanges ?? 0} above ${lat.budget_secs ?? "?"}s`,
+    "",
+    ...Object.entries(m.component_ttfb || {}).map(([k, v]) => row(k + " ttfb", v)),
+    "",
+    row("caller response", m.user_response),
+    `${"interruptions".padEnd(22)} ${m.interruptions ?? 0}`,
+    `${"backchannels ignored".padEnd(22)} ${m.backchannels_suppressed ?? 0}`,
+    `${"re-engagements".padEnd(22)} ${m.reengagement_prompts ?? 0}`,
+    `${"tokens".padEnd(22)} prompt ${(m.tokens || {}).prompt ?? 0} · completion ${(m.tokens || {}).completion ?? 0}`,
+  ].join("\n");
+}
+
+$("callsRefresh").onclick = loadCalls;
+
+// Follow the audio: highlight the line currently being spoken.
+$("cdAudio").addEventListener("timeupdate", () => {
+  const t = $("cdAudio").currentTime;
+  let active = -1;
+  for (let i = 0; i < tlines.length; i++) if ((tlines[i].at_secs || 0) <= t) active = i;
+  document.querySelectorAll("#cdTranscript .tline").forEach((n) =>
+    n.classList.toggle("on", +n.dataset.i === active));
+});
+
+/* ================= TEST CALL ================= */
+let pc = null, chan = null, micStream = null, audioEl = null;
+let started = 0, durTimer = null, audioCtx = null, rafId = null;
+let tVadStop = 0, tTurnEnd = 0, awaitingReply = false;
+let samples = [], interruptions = 0, ttfb = {}, botBubble = null;
+
+const setConn = (s, t) => { $("dConn").className = "dot " + s; $("tConn").textContent = t; };
+const setWho = (s, t, live) => {
+  $("dWho").className = "dot " + s + (live ? " live" : ""); $("tWho").textContent = t;
+};
+
+function addMsg(who, text) {
+  $("empty")?.remove();
+  const d = document.createElement("div");
+  d.className = "msg " + who;
+  d.innerHTML = `<div class="who">${who === "user" ? "You" : "Bot"}</div>`;
+  d.appendChild(document.createTextNode(text));
+  $("log").append(d); $("log").scrollTop = 1e9;
+  return d;
+}
+function addEvent(t) {
+  $("empty")?.remove();
+  const d = document.createElement("div");
+  d.className = "msg event"; d.textContent = t;
+  $("log").append(d); $("log").scrollTop = 1e9;
+}
+function botText(t) {
+  if (!botBubble) botBubble = addMsg("bot", "");
+  botBubble.appendChild(document.createTextNode(t));
+  $("log").scrollTop = 1e9;
+}
+
+function budgetMs() { return Number($("f_latency_budget_ms").value) || 500; }
+
+function recordLatency() {
+  if (!awaitingReply || !tVadStop) return;
+  awaitingReply = false;
+  const now = performance.now();
+  const v2v = now - tVadStop;
+  const td = tTurnEnd ? tTurnEnd - tVadStop : null;
+  const rs = tTurnEnd ? now - tTurnEnd : null;
+  tVadStop = tTurnEnd = 0;
+  samples.push(v2v);
+
+  const B = budgetMs();
+  $("v2v").className = "big " + (v2v <= B ? "good" : v2v <= B * 1.6 ? "warn" : "bad");
+  $("v2v").innerHTML = Math.round(v2v) + "<small>ms</small>";
+  const scale = Math.max(v2v, B);
+  if (td !== null) { $("valTd").textContent = Math.round(td) + "ms"; $("barTd").style.width = td / scale * 100 + "%"; }
+  if (rs !== null) { $("valRs").textContent = Math.round(rs) + "ms"; $("barRs").style.width = rs / scale * 100 + "%"; }
+
+  const sorted = [...samples].sort((a, b) => a - b);
+  $("sTurns").textContent = samples.length;
+  $("sP50").textContent = Math.round(sorted[Math.floor(sorted.length / 2)]) + " ms";
+  $("sMax").textContent = Math.round(Math.max(...samples)) + " ms";
+  $("sBudget").textContent = Math.round(samples.filter((s) => s <= B).length / samples.length * 100) + "%";
+}
+
+function onRtvi({ type, data }) {
+  switch (type) {
+    case "bot-ready": setConn("on", "Connected"); addEvent("— bot ready —"); break;
+    case "vad-user-started-speaking": setWho("busy", "You're speaking", true); break;
+    case "vad-user-stopped-speaking":
+      tVadStop = performance.now(); tTurnEnd = 0; awaitingReply = true;
+      setWho("busy", "Thinking", true); break;
+    case "user-stopped-speaking": if (awaitingReply) tTurnEnd = performance.now(); break;
+    case "user-transcription":
+      if (data?.final && data.text?.trim()) addMsg("user", data.text.trim()); break;
+    case "bot-started-speaking": recordLatency(); setWho("on", "Bot speaking", true); botBubble = null; break;
+    case "bot-stopped-speaking": setWho("", "Idle"); botBubble = null; break;
+    case "bot-tts-text": if (data?.text) botText(data.text); break;
+    case "bot-interrupted":
+      $("sInt").textContent = ++interruptions; addEvent("— you interrupted the bot —"); botBubble = null; break;
+    case "metrics":
+      for (const m of data?.ttfb || []) {
+        ttfb[String(m.processor || "?").replace(/#\d+$/, "")] = m.value;
+      }
+      $("tTtfb").innerHTML = Object.entries(ttfb)
+        .map(([k, v]) => `<tr><td>${k}</td><td>${Math.round(v * 1000)} ms</td></tr>`).join("");
+      break;
+    case "error": addEvent("error: " + (data?.message || "unknown")); break;
+  }
+}
+
+function startMeter(stream) {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const an = audioCtx.createAnalyser(); an.fftSize = 512;
+  audioCtx.createMediaStreamSource(stream).connect(an);
+  const buf = new Uint8Array(an.frequencyBinCount);
+  (function tick() {
+    an.getByteTimeDomainData(buf);
+    let peak = 0; for (const v of buf) peak = Math.max(peak, Math.abs(v - 128));
+    $("level").style.width = Math.min(100, peak / 128 * 240) + "%";
+    rafId = requestAnimationFrame(tick);
+  })();
+}
+
+async function connect() {
+  if (!current?.id) { toast("Save the agent first"); showTab("build"); return; }
+  const base = $("url").value.replace(/\/$/, "");
+  setConn("busy", "Connecting…"); $("btnCall").disabled = true;
+  samples = []; interruptions = 0; ttfb = {}; $("log").innerHTML = "";
+  addEvent(`— calling "${current.name}" —`);
+
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+  } catch {
+    setConn("err", "Mic denied"); $("btnCall").disabled = false;
+    addEvent("microphone permission denied"); return;
+  }
+  startMeter(micStream);
+
+  pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+  chan = pc.createDataChannel("rtvi");   // server listens for a client-created channel
+  chan.onmessage = (e) => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.label === "rtvi-ai") onRtvi(m);
+  };
+  micStream.getTracks().forEach((t) => pc.addTrack(t, micStream));
+  audioEl = new Audio(); audioEl.autoplay = true;
+  pc.ontrack = (e) => { audioEl.srcObject = e.streams[0]; };
+  pc.onconnectionstatechange = () => {
+    if (["failed", "closed", "disconnected"].includes(pc.connectionState)) hangup(true);
+  };
+
+  await pc.setLocalDescription(await pc.createOffer());
+  await new Promise((res) => {
+    if (pc.iceGatheringState === "complete") return res();
+    const f = () => pc.iceGatheringState === "complete" &&
+      (pc.removeEventListener("icegatheringstatechange", f), res());
+    pc.addEventListener("icegatheringstatechange", f);
+    setTimeout(res, 3000);
+  });
+
+  let answer;
+  try {
+    const r = await fetch(base + "/api/offer", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      // request_data reaches the bot as runner_args.body -> selects the agent.
+      body: JSON.stringify({
+        sdp: pc.localDescription.sdp, type: pc.localDescription.type,
+        request_data: { agent: current.id },
+      }),
+    });
+    if (!r.ok) throw new Error(r.status);
+    answer = await r.json();
+  } catch {
+    setConn("err", "Bot unreachable"); $("btnCall").disabled = false;
+    addEvent(`could not reach ${base} — is \`python bot.py -t webrtc\` running?`); return;
+  }
+  await pc.setRemoteDescription(answer);
+
+  setConn("on", "Connected"); setWho("", "Idle");
+  $("btnCall").disabled = false; $("btnCall").textContent = "End call";
+  $("btnCall").className = "danger"; $("btnMic").disabled = false;
+  started = Date.now();
+  durTimer = setInterval(() => {
+    const s = Math.floor((Date.now() - started) / 1000);
+    $("pDur").textContent = String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  }, 500);
+}
+
+function hangup(silent) {
+  rafId && cancelAnimationFrame(rafId); rafId = null;
+  audioCtx && audioCtx.close(); audioCtx = null;
+  durTimer && clearInterval(durTimer); durTimer = null;
+  micStream && micStream.getTracks().forEach((t) => t.stop()); micStream = null;
+  chan && chan.close(); chan = null;
+  pc && pc.close(); pc = null;
+  setConn("", "Disconnected"); setWho("", "Idle");
+  $("level").style.width = "0%";
+  $("btnCall").textContent = "Start call"; $("btnCall").className = "primary";
+  $("btnCall").disabled = false; $("btnMic").disabled = true;
+  $("btnMic").textContent = "Mute"; $("btnMic").classList.remove("active");
+  if (!silent) addEvent("— call ended —");
+}
+
+$("btnCall").onclick = () => (pc ? hangup() : connect());
+$("btnMic").onclick = () => {
+  const t = micStream?.getAudioTracks()[0]; if (!t) return;
+  t.enabled = !t.enabled;
+  $("btnMic").textContent = t.enabled ? "Mute" : "Unmute";
+  $("btnMic").classList.toggle("active", !t.enabled);
+};
+addEventListener("beforeunload", () => pc && hangup(true));
+
+boot().catch((e) => toast("Could not reach the console API: " + e.message));
+</script>
+</body>
+</html>
