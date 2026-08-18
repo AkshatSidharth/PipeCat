@@ -1,0 +1,28 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: voicebot-prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      timeInterval: 5s
+      httpMethod: POST
+
+  - name: Loki
+    type: loki
+    uid: voicebot-loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      maxLines: 1000
+      # Turn call_id values in log lines into links back into the logs,
+      # so you can pivot from one call's metric spike to that call's logs.
+      derivedFields:
+        - name: call_id
+          matcherType: label
+          matcherRegex: call_id
+          url: '/explore?left={"datasource":"voicebot-loki","queries":[{"expr":"{service=\"pipecat-voicebot\"} | json | call_id=\"${__value.raw}\""}]}'
+          datasourceUid: voicebot-loki

@@ -1,0 +1,27 @@
+[project]
+name = "pipecat-voicebot"
+version = "0.1.0"
+description = "End-to-end Pipecat voicebot with Grafana/Loki observability, call recording, interruption handling and smart turn detection"
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    # Pinned: the 1.x API (PipelineWorker, turns/ strategies, LLMContext) differs
+    # substantially from 0.0.x. Do not float this without re-reading the changelog.
+    # soniox and openai need no extra (openai is a base dep, soniox rides the
+    # base websockets/aiohttp deps); sarvam pulls in sarvamai; websocket pulls
+    # in fastapi for the inbound telephony transports.
+    "pipecat-ai[daily,sarvam,silero,webrtc,websocket,runner,tracing]==1.7.0",
+    "prometheus-client>=0.21",
+    # Direct dependency since voicebot/filler.py mixes PCM itself. Pipecat
+    # already pulls it in; pinning it here makes that reliance explicit.
+    "numpy>=1.26",
+    "httpx>=0.27",
+    "pydantic-settings>=2.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.24"]
+
+[tool.setuptools.packages.find]
+include = ["voicebot*"]
